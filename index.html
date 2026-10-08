@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Table Turn — Planificateur de réunions</title>
+<meta name="description" content="Définissez les disponibilités, listez vos réunions, et obtenez le meilleur planning de la journée.">
+<style>
+:root {
+  --bg: #f5f6fa; --card: #ffffff; --ink: #1b2130; --muted: #667085; --line: #e2e5ed;
+  --accent: #4f46e5; --accent-ink: #ffffff; --accent-soft: #eceafd;
+  --on: #b7e6c6; --on-line: #86d0a0; --off: #eceef3; --danger: #d92d20; --ok: #1a7f4b;
+  --warn-bg: #fff4e5; --warn-ink: #8a4b00;
+  --meet-l: 88%; --meet-ink: #1b2130; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1219; --card: #171b25; --ink: #e8ebf2; --muted: #9aa3b5; --line: #2a3040;
+    --accent: #8b87ff; --accent-ink: #11131a; --accent-soft: #25264a;
+    --on: #1f5c3a; --on-line: #2f7d50; --off: #20253199; --danger: #ff7a6e; --ok: #5fd08f;
+    --warn-bg: #3a2a10; --warn-ink: #ffcf8a;
+    --meet-l: 27%; --meet-ink: #f1f3f8; --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px clamp(12px, 3vw, 28px) 8px; max-width: 1200px; margin: 0 auto; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo { width: 40px; height: 40px; border-radius: 12px; background: var(--accent); color: var(--accent-ink);
+  display: grid; place-items: center; font-size: 22px; font-weight: 700; }
+h1 { margin: 0; font-size: 20px; line-height: 1.1; }
+.brand p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.top-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.btn { border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 7px 12px; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.btn.small { padding: 3px 8px; font-size: 12.5px; border-radius: 8px; }
+.btn.danger { color: var(--danger); }
+.icon { border: none; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 6px; }
+.icon:hover { color: var(--danger); background: var(--off); }
+
+.tabs { display: flex; gap: 4px; max-width: 1200px; margin: 8px auto 0; padding: 0 clamp(12px, 3vw, 28px); border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tab { border: none; background: none; padding: 10px 14px; border-bottom: 3px solid transparent; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.tab .n { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 6px; border-radius: 10px; background: var(--off); color: var(--muted); font-size: 12px; text-align: center; }
+
+main { max-width: 1200px; margin: 0 auto; padding: 16px clamp(12px, 3vw, 28px) 60px; }
+section[hidden] { display: none; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 14px; }
+.intro { color: var(--muted); margin: 0 0 12px; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 12px; }
+.bar label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13.5px; }
+.bar select { border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; background: var(--card); }
+.spacer { flex: 1; }
+
+/* Grilles */
+.scroll { overflow-x: auto; padding-bottom: 4px; }
+table.grid { border-collapse: separate; border-spacing: 0; user-select: none; -webkit-user-select: none; }
+.grid th, .grid td { padding: 0; }
+.grid thead th { font-size: 11.5px; color: var(--muted); font-weight: 600; text-align: left; padding: 0 0 4px 4px; white-space: nowrap; border-left: 1px solid var(--line); }
+.grid th.name { position: sticky; left: 0; z-index: 2; background: var(--card); min-width: 150px; max-width: 150px; text-align: left; padding: 3px 6px 3px 0; border-left: none; }
+.grid thead th.name { border-left: none; }
+.grid .pname { width: 108px; border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 5px 6px; font-weight: 600; }
+.grid .pname:hover, .grid .pname:focus { border-color: var(--line); background: var(--card); outline: none; }
+.nm { display: inline-block; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; padding: 5px 0; vertical-align: middle; }
+td.slot { width: 26px; min-width: 26px; height: 32px; background: var(--off); border-top: 2px solid var(--card); border-bottom: 2px solid var(--card); cursor: pointer; }
+td.slot.hh { border-left: 1px solid var(--line); }
+td.slot.on { background: var(--on); box-shadow: inset 0 0 0 1px var(--on-line); }
+td.slot.blocked { background: repeating-linear-gradient(45deg, var(--off), var(--off) 4px, var(--line) 4px, var(--line) 8px); box-shadow: none; cursor: not-allowed; }
+td.tot { padding: 0 10px; font-size: 12.5px; color: var(--muted); white-space: nowrap; text-align: right; }
+td.acts { white-space: nowrap; padding-left: 6px; }
+td.acts .btn { margin-left: 3px; }
+.legend { display: flex; gap: 14px; align-items: center; margin-top: 10px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
+.sw { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -2px; margin-right: 4px; }
+
+/* Réunions */
+.meet-list { display: grid; gap: 10px; }
+.meet { display: grid; gap: 10px; }
+.meet.prio { border-left: 5px solid #f59e0b; }
+.mrow { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.mtitle { flex: 1 1 220px; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; background: var(--card); font-weight: 600; }
+.mrow select { border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; background: var(--card); }
+.checkprio { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer; }
+.checkprio input { width: 18px; height: 18px; accent-color: #f59e0b; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 4px 11px; font-size: 13.5px; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.warn { background: var(--warn-bg); color: var(--warn-ink); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+.empty { text-align: center; color: var(--muted); padding: 28px 10px; }
+
+/* Planning */
+.summary { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.stat { flex: 1 1 150px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+.stat b { display: block; font-size: 22px; }
+.stat span { color: var(--muted); font-size: 12.5px; }
+.stat.good b { color: var(--ok); }
+.stat.bad b { color: var(--danger); }
+td.cell { width: 26px; min-width: 26px; height: 40px; border-top: 2px solid var(--card); border-bottom: 2px solid var(--card); background: var(--off); }
+td.cell.hh { border-left: 1px solid var(--line); }
+td.cell.free { background: color-mix(in srgb, var(--on) 45%, transparent); }
+td.cell.blocked { background: repeating-linear-gradient(45deg, var(--off), var(--off) 4px, var(--line) 4px, var(--line) 8px); }
+td.blk { height: 40px; padding: 0 6px; border-radius: 8px; border-left: 4px solid hsl(var(--h) 60% 48%);
+  background: hsl(var(--h) 65% var(--meet-l)); color: var(--meet-ink); font-size: 12.5px; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 0; }
+.agenda { display: grid; gap: 8px; margin-top: 16px; }
+.slotline { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); border-left: 6px solid hsl(var(--h) 60% 48%); }
+.slotline .time { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 112px; }
+.slotline .who { color: var(--muted); font-size: 13.5px; }
+.star { color: #f59e0b; }
+.unplaced { margin-top: 16px; border: 1px solid var(--danger); border-radius: 12px; padding: 12px 14px; background: color-mix(in srgb, var(--danger) 7%, var(--card)); }
+.unplaced h3 { margin: 0 0 6px; font-size: 15px; color: var(--danger); }
+.unplaced ul { margin: 0; padding-left: 18px; }
+.unplaced li { margin: 4px 0; }
+.note { color: var(--muted); font-size: 12.5px; margin-top: 12px; }
+h2 { font-size: 16px; margin: 18px 0 8px; }
+
+@media print {
+  .top-actions, .tabs, .bar button, .no-print { display: none !important; }
+  body { background: #fff; }
+  section[hidden] { display: none !important; }
+  main { padding: 0; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <div class="logo" aria-hidden="true">⟳</div>
+    <div>
+      <h1>Table Turn</h1>
+      <p>Le meilleur planning de réunions pour la journée</p>
+    </div>
+  </div>
+  <div class="top-actions">
+    <button class="btn" id="btnExample" title="Charger un jeu de données d'exemple">Exemple</button>
+    <button class="btn" id="btnExport" title="Télécharger les données (JSON)">Exporter</button>
+    <button class="btn" id="btnImport" title="Charger un fichier JSON">Importer</button>
+    <button class="btn danger" id="btnClear" title="Tout supprimer">Tout vider</button>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button class="tab" role="tab" data-tab="avail" aria-selected="true">1 · Disponibilités <span class="n" id="nPeople">0</span></button>
+  <button class="tab" role="tab" data-tab="meet" aria-selected="false">2 · Réunions <span class="n" id="nMeet">0</span></button>
+  <button class="tab" role="tab" data-tab="plan" aria-selected="false">3 · Planning</button>
+</nav>
+
+<main>
+  <!-- 1. Disponibilités -->
+  <section id="tab-avail" role="tabpanel">
+    <p class="intro">Chaque matin : cliquez (ou glissez à la souris) sur les créneaux de 30 min où chaque personne est disponible.</p>
+    <div class="card">
+      <div class="bar">
+        <label>Début <select id="selStart"></select></label>
+        <label>Fin <select id="selEnd"></select></label>
+        <label><input type="checkbox" id="chkLunch"> Pause déjeuner
+          <select id="selLunchFrom"></select> à <select id="selLunchTo"></select></label>
+        <span class="spacer"></span>
+        <button class="btn" id="btnAddPerson">+ Ajouter une personne</button>
+        <button class="btn" id="btnResetAvail" title="Remet tout le monde disponible sur toute la journée">Tous dispos</button>
+      </div>
+      <div class="scroll" id="availWrap"></div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--on);box-shadow:inset 0 0 0 1px var(--on-line)"></i>Disponible</span>
+        <span><i class="sw" style="background:var(--off)"></i>Indisponible</span>
+        <span><i class="sw" style="background:repeating-linear-gradient(45deg,var(--off),var(--off) 3px,var(--line) 3px,var(--line) 6px)"></i>Fermé pour tous</span>
+      </div>
+    </div>
+    <p style="text-align:right"><button class="btn primary" data-goto="meet">Suite : les réunions →</button></p>
+  </section>
+
+  <!-- 2. Réunions -->
+  <section id="tab-meet" role="tabpanel" hidden>
+    <p class="intro">Pour chaque réunion : participants requis, durée (par pas de 30 min) et priorité. Les réunions prioritaires ★ sont placées en premier.</p>
+    <div class="bar">
+      <button class="btn primary" id="btnAddMeet">+ Ajouter une réunion</button>
+    </div>
+    <div class="meet-list" id="meetList"></div>
+    <p style="text-align:right"><button class="btn primary" data-goto="plan">Calculer le planning →</button></p>
+  </section>
+
+  <!-- 3. Planning -->
+  <section id="tab-plan" role="tabpanel" hidden>
+    <div class="bar no-print">
+      <button class="btn primary" id="btnSolve">Recalculer</button>
+      <span class="spacer"></span>
+      <button class="btn" id="btnCopy">Copier le planning</button>
+      <button class="btn" id="btnPrint">Imprimer</button>
+    </div>
+    <div id="planOut"></div>
+  </section>
+</main>
+
+<input type="file" id="fileIn" accept="application/json,.json" hidden>
+
+<script src="scheduler.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- Utilitaires ---------- */
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var KEY = 'table_turn_v1';
+  var uid = function () { return Math.random().toString(36).slice(2, 9); };
+  var pad = function (n) { return String(n).padStart(2, '0'); };
+  var slotLabel = function (s) { return pad(Math.floor(s / 2)) + ':' + (s % 2 ? '30' : '00'); };
+  var durLabel = function (k) {
+    var m = k * 30, h = Math.floor(m / 60), r = m % 60;
+    return h ? (r ? h + ' h ' + pad(r) : h + ' h') : r + ' min';
+  };
+  var esc = function (s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  };
+  var range = function (a, b) { var r = []; for (var i = a; i < b; i++) r.push(i); return r; };
+
+  /* ---------- État ---------- */
+  function newAvail(from, to) {
+    var a = new Array(48).fill(false);
+    for (var s = from; s < to; s++) a[s] = true;
+    return a;
+  }
+  function example() {
+    var mk = function (name, from, to) { return { id: uid(), name: name, avail: newAvail(from, to) }; };
+    var al = mk('Alice', 16, 36), br = mk('Bruno', 26, 36), ch = mk('Chloé', 16, 24), da = mk('David', 16, 36), em = mk('Emma', 18, 32);
+    return {
+      startH: 8, endH: 18,
+      lunch: { on: true, from: 24, to: 27 },
+      people: [al, br, ch, da, em],
+      meetings: [
+        { id: uid(), title: 'Comité de pilotage', people: [al.id, br.id, da.id], dur: 3, prio: true },
+        { id: uid(), title: 'Revue budget', people: [da.id, em.id], dur: 2, prio: true },
+        { id: uid(), title: 'Point technique', people: [al.id, ch.id], dur: 2, prio: false },
+        { id: uid(), title: 'Stand-up équipe', people: [al.id, br.id, ch.id, da.id, em.id], dur: 1, prio: false },
+        { id: uid(), title: 'Entretien individuel', people: [br.id, em.id], dur: 2, prio: false }
+      ]
+    };
+  }
+  function blank() {
+    return { startH: 8, endH: 18, lunch: { on: false, from: 24, to: 27 }, people: [], meetings: [] };
+  }
+  function sanitize(d) {
+    if (!d || !Array.isArray(d.people) || !Array.isArray(d.meetings)) return null;
+    var s = blank();
+    s.startH = Math.min(Math.max(+d.startH || 8, 0), 22);
+    s.endH = Math.min(Math.max(+d.endH || 18, s.startH + 1), 24);
+    if (d.lunch) s.lunch = { on: !!d.lunch.on, from: +d.lunch.from || 24, to: +d.lunch.to || 27 };
+    s.people = d.people.map(function (p) {
+      var a = new Array(48).fill(false);
+      if (Array.isArray(p.avail)) for (var i = 0; i < 48; i++) a[i] = !!p.avail[i];
+      return { id: String(p.id || uid()), name: String(p.name || ''), avail: a };
+    });
+    var ids = s.people.map(function (p) { return p.id; });
+    s.meetings = d.meetings.map(function (m) {
+      return {
+        id: String(m.id || uid()), title: String(m.title || ''),
+        people: (Array.isArray(m.people) ? m.people : []).map(String).filter(function (id) { return ids.indexOf(id) >= 0; }),
+        dur: Math.min(Math.max(parseInt(m.dur, 10) || 2, 1), 16), prio: !!m.prio
+      };
+    });
+    return s;
+  }
+  function load() {
+    try { return sanitize(JSON.parse(localStorage.getItem(KEY))); } catch (e) { return null; }
+  }
+  var state = load() || example();
+  var plan = null;
+  var currentTab = 'avail';
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* stockage indisponible */ }
+  }
+  var personById = function (id) { return state.people.filter(function (p) { return p.id === id; })[0]; };
+  var meetingById = function (id) { return state.meetings.filter(function (m) { return m.id === id; })[0]; };
+  var isBlocked = function (s) { return state.lunch.on && s >= state.lunch.from && s < state.lunch.to; };
+  var personName = function (p) { return p.name.trim() || 'Sans nom'; };
+  var hueOf = function (m) { return (state.meetings.indexOf(m) * 57 + 12) % 360; };
+
+  /* ---------- Onglets ---------- */
+  function setTab(name) {
+    currentTab = name;
+    ['avail', 'meet', 'plan'].forEach(function (t) { $('#tab-' + t).hidden = t !== name; });
+    document.querySelectorAll('.tab').forEach(function (b) {
+      b.setAttribute('aria-selected', String(b.dataset.tab === name));
+    });
+    if (name === 'avail') renderAvail();
+    if (name === 'meet') renderMeetings();
+    if (name === 'plan') computePlan();
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll('.tab').forEach(function (b) { b.addEventListener('click', function () { setTab(b.dataset.tab); }); });
+  document.querySelectorAll('[data-goto]').forEach(function (b) { b.addEventListener('click', function () { setTab(b.dataset.goto); }); });
+
+  function updateCounts() {
+    $('#nPeople').textContent = state.people.length;
+    $('#nMeet').textContent = state.meetings.length;
+  }
+
+  /* ---------- 1. Disponibilités ---------- */
+  function fillSelect(sel, values, labelFn, current) {
+    sel.innerHTML = values.map(function (v) {
+      return '<option value="' + v + '"' + (v === current ? ' selected' : '') + '>' + labelFn(v) + '</option>';
+    }).join('');
+  }
+  function renderSettings() {
+    fillSelect($('#selStart'), range(5, 13), function (h) { return pad(h) + ':00'; }, state.startH);
+    fillSelect($('#selEnd'), range(13, 24), function (h) { return pad(h) + ':00'; }, state.endH);
+    fillSelect($('#selLunchFrom'), range(20, 31), slotLabel, state.lunch.from);
+    fillSelect($('#selLunchTo'), range(21, 33), slotLabel, state.lunch.to);
+    $('#chkLunch').checked = state.lunch.on;
+    $('#selLunchFrom').disabled = $('#selLunchTo').disabled = !state.lunch.on;
+  }
+  function totalLabel(p) {
+    var n = 0;
+    for (var s = state.startH * 2; s < state.endH * 2; s++) if (p.avail[s] && !isBlocked(s)) n++;
+    return durLabel(n);
+  }
+  function renderAvail() {
+    updateCounts();
+    renderSettings();
+    var lo = state.startH * 2, hi = state.endH * 2;
+    if (!state.people.length) {
+      $('#availWrap').innerHTML = '<div class="empty">Aucune personne pour l’instant. Ajoutez-en avec « + Ajouter une personne ».</div>';
+      return;
+    }
+    var h = '<table class="grid" id="availGrid"><thead><tr><th class="name">Personne</th>';
+    for (var hr = state.startH; hr < state.endH; hr++) h += '<th colspan="2">' + pad(hr) + 'h</th>';
+    h += '<th></th><th></th></tr></thead><tbody>';
+    state.people.forEach(function (p) {
+      h += '<tr data-p="' + p.id + '"><th class="name"><input class="pname" value="' + esc(p.name) + '" placeholder="Nom" aria-label="Nom"><button class="icon" data-act="delp" title="Supprimer cette personne" aria-label="Supprimer">×</button></th>';
+      for (var s = lo; s < hi; s++) {
+        h += '<td class="slot' + (p.avail[s] ? ' on' : '') + (isBlocked(s) ? ' blocked' : '') + (s % 2 === 0 ? ' hh' : '') +
+          '" data-s="' + s + '" title="' + slotLabel(s) + '–' + slotLabel(s + 1) + '"></td>';
+      }
+      h += '<td class="tot" data-tot>' + totalLabel(p) + '</td><td class="acts">' +
+        '<button class="btn small" data-act="all">Journée</button>' +
+        '<button class="btn small" data-act="am">Matin</button>' +
+        '<button class="btn small" data-act="pm">Après-midi</button>' +
+        '<button class="btn small" data-act="none">Aucun</button></td></tr>';
+    });
+    h += '</tbody></table>';
+    $('#availWrap').innerHTML = h;
+  }
+
+  var paint = null, lastPointer = 'mouse';
+  var wrap = $('#availWrap');
+  function applySlot(td, val) {
+    var p = personById(td.closest('tr').dataset.p);
+    var s = +td.dataset.s;
+    if (!p || td.classList.contains('blocked')) return;
+    p.avail[s] = val;
+    td.classList.toggle('on', val);
+  }
+  wrap.addEventListener('pointerdown', function (e) {
+    lastPointer = e.pointerType;
+    if (e.pointerType !== 'mouse') return;
+    var td = e.target.closest('td.slot');
+    if (!td || td.classList.contains('blocked')) return;
+    e.preventDefault();
+    paint = { val: !td.classList.contains('on') };
+    applySlot(td, paint.val);
+  });
+  wrap.addEventListener('pointerover', function (e) {
+    if (!paint) return;
+    var td = e.target.closest('td.slot');
+    if (td) applySlot(td, paint.val);
+  });
+  window.addEventListener('pointerup', function () {
+    if (!paint) return;
+    paint = null; save(); refreshTotals();
+  });
+  function refreshTotals() {
+    wrap.querySelectorAll('tr[data-p]').forEach(function (tr) {
+      tr.querySelector('[data-tot]').textContent = totalLabel(personById(tr.dataset.p));
+    });
+  }
+  wrap.addEventListener('click', function (e) {
+    var td = e.target.closest('td.slot');
+    if (td) {
+      if (lastPointer === 'mouse') return; // déjà géré par pointerdown
+      applySlot(td, !td.classList.contains('on'));
+      save(); refreshTotals();
+      return;
+    }
+    var btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    var p = personById(btn.closest('tr').dataset.p);
+    var lo = state.startH * 2, hi = state.endH * 2, act = btn.dataset.act;
+    if (act === 'delp') {
+      if (!confirm('Supprimer ' + personName(p) + ' ?')) return;
+      state.people = state.people.filter(function (q) { return q !== p; });
+      state.meetings.forEach(function (m) { m.people = m.people.filter(function (id) { return id !== p.id; }); });
+    } else {
+      for (var s = lo; s < hi; s++) {
+        p.avail[s] = act === 'all' ? true : act === 'none' ? false : act === 'am' ? s < 24 : s >= 24;
+      }
+    }
+    save(); renderAvail(); updateCounts();
+  });
+  wrap.addEventListener('input', function (e) {
+    if (!e.target.classList.contains('pname')) return;
+    personById(e.target.closest('tr').dataset.p).name = e.target.value;
+    save();
+  });
+
+  $('#btnAddPerson').addEventListener('click', function () {
+    state.people.push({ id: uid(), name: 'Personne ' + (state.people.length + 1), avail: newAvail(state.startH * 2, state.endH * 2) });
+    save(); renderAvail();
+    var inputs = wrap.querySelectorAll('.pname');
+    if (inputs.length) { var last = inputs[inputs.length - 1]; last.focus(); last.select(); }
+  });
+  $('#btnResetAvail').addEventListener('click', function () {
+    state.people.forEach(function (p) { p.avail = newAvail(state.startH * 2, state.endH * 2); });
+    save(); renderAvail();
+  });
+  $('#selStart').addEventListener('change', function (e) {
+    state.startH = +e.target.value; if (state.endH <= state.startH) state.endH = state.startH + 1;
+    save(); renderAvail();
+  });
+  $('#selEnd').addEventListener('change', function (e) {
+    state.endH = +e.target.value; if (state.startH >= state.endH) state.startH = state.endH - 1;
+    save(); renderAvail();
+  });
+  $('#chkLunch').addEventListener('change', function (e) { state.lunch.on = e.target.checked; save(); renderAvail(); });
+  $('#selLunchFrom').addEventListener('change', function (e) {
+    state.lunch.from = +e.target.value; if (state.lunch.to <= state.lunch.from) state.lunch.to = state.lunch.from + 1;
+    save(); renderAvail();
+  });
+  $('#selLunchTo').addEventListener('change', function (e) {
+    state.lunch.to = +e.target.value; if (state.lunch.from >= state.lunch.to) state.lunch.from = state.lunch.to - 1;
+    save(); renderAvail();
+  });
+
+  /* ---------- 2. Réunions ---------- */
+  function renderMeetings() {
+    updateCounts();
+    var box = $('#meetList');
+    if (!state.people.length) {
+      box.innerHTML = '<div class="card empty">Ajoutez d’abord des personnes dans l’onglet « Disponibilités ».</div>';
+      return;
+    }
+    if (!state.meetings.length) {
+      box.innerHTML = '<div class="card empty">Aucune réunion. Cliquez sur « + Ajouter une réunion ».</div>';
+      return;
+    }
+    var maxDur = Math.max(1, (state.endH - state.startH) * 2);
+    var durs = range(1, Math.min(16, maxDur) + 1);
+    box.innerHTML = state.meetings.map(function (m) {
+      var opts = durs.concat(durs.indexOf(m.dur) < 0 ? [m.dur] : []).sort(function (a, b) { return a - b; }).map(function (k) {
+        return '<option value="' + k + '"' + (k === m.dur ? ' selected' : '') + '>' + durLabel(k) + '</option>';
+      }).join('');
+      var chips = state.people.map(function (p) {
+        return '<button class="chip" data-act="toggle" data-p="' + p.id + '" aria-pressed="' + (m.people.indexOf(p.id) >= 0) + '">' + esc(personName(p)) + '</button>';
+      }).join('');
+      var warn = !m.people.length ? '<div class="warn">Sélectionnez au moins un participant.</div>' : '';
+      return '<article class="card meet' + (m.prio ? ' prio' : '') + '" data-m="' + m.id + '">' +
+        '<div class="mrow"><input class="mtitle" value="' + esc(m.title) + '" placeholder="Titre de la réunion" aria-label="Titre">' +
+        '<select data-f="dur" aria-label="Durée">' + opts + '</select>' +
+        '<label class="checkprio"><input type="checkbox" data-f="prio"' + (m.prio ? ' checked' : '') + '> <span class="star">★</span> Prioritaire</label>' +
+        '<button class="icon" data-act="delm" title="Supprimer cette réunion" aria-label="Supprimer">×</button></div>' +
+        '<div class="chips">' + chips + '<button class="btn small" data-act="allp">Tous</button><button class="btn small" data-act="nonep">Aucun</button></div>' +
+        warn + '</article>';
+    }).join('');
+  }
+  var list = $('#meetList');
+  list.addEventListener('input', function (e) {
+    if (!e.target.classList.contains('mtitle')) return;
+    meetingById(e.target.closest('[data-m]').dataset.m).title = e.target.value;
+    save();
+  });
+  list.addEventListener('change', function (e) {
+    var f = e.target.dataset.f;
+    if (!f) return;
+    var m = meetingById(e.target.closest('[data-m]').dataset.m);
+    if (f === 'dur') m.dur = +e.target.value;
+    if (f === 'prio') m.prio = e.target.checked;
+    save(); renderMeetings();
+  });
+  list.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act]');
+    if (!b) return;
+    var m = meetingById(b.closest('[data-m]').dataset.m);
+    var act = b.dataset.act;
+    if (act === 'toggle') {
+      var i = m.people.indexOf(b.dataset.p);
+      if (i >= 0) m.people.splice(i, 1); else m.people.push(b.dataset.p);
+    } else if (act === 'allp') {
+      m.people = state.people.map(function (p) { return p.id; });
+    } else if (act === 'nonep') {
+      m.people = [];
+    } else if (act === 'delm') {
+      state.meetings = state.meetings.filter(function (x) { return x !== m; });
+    }
+    save(); renderMeetings(); updateCounts();
+  });
+  $('#btnAddMeet').addEventListener('click', function () {
+    if (!state.people.length) { alert('Ajoutez d’abord des personnes dans l’onglet « Disponibilités ».'); return; }
+    state.meetings.push({ id: uid(), title: 'Réunion ' + (state.meetings.length + 1), people: [], dur: 2, prio: false });
+    save(); renderMeetings(); updateCounts();
+    var t = list.querySelectorAll('.mtitle');
+    if (t.length) { var last = t[t.length - 1]; last.focus(); last.select(); }
+  });
+
+  /* ---------- 3. Planning ---------- */
+  function computePlan() {
+    $('#planOut').innerHTML = '<div class="card empty">Calcul du meilleur planning…</div>';
+    setTimeout(function () {
+      var lo = state.startH * 2, hi = state.endH * 2;
+      var blocked = new Array(48).fill(false);
+      for (var s = 0; s < 48; s++) blocked[s] = isBlocked(s);
+      plan = Scheduler.solve({
+        lo: lo, hi: hi, blocked: blocked,
+        people: state.people.map(function (p) { return { id: p.id, avail: p.avail }; }),
+        meetings: state.meetings.map(function (m) { return { id: m.id, people: m.people, dur: m.dur, prio: m.prio }; })
+      });
+      renderPlan();
+    }, 30);
+  }
+  function titleOf(m) { return m.title.trim() || 'Sans titre'; }
+  function reasonText(u) {
+    var m = meetingById(u.id);
+    var names = function (ids) { return ids.map(function (id) { var p = personById(id); return p ? personName(p) : '?'; }).join(', '); };
+    var mt = function (ids) { return ids.map(function (id) { var x = meetingById(id); return x ? '« ' + titleOf(x) + ' »' : '?'; }).join(', '); };
+    if (u.reason === 'no-people') return 'Aucun participant sélectionné.';
+    if (u.reason === 'too-long') return 'Plus longue que la journée.';
+    if (u.reason === 'none-common') {
+      if (u.blockers && u.blockers.length) {
+        return 'Pas de plage de ' + durLabel(m.dur) + ' d’affilée pour : ' + names(u.blockers) + '. Élargissez ses disponibilités ou raccourcissez la réunion.';
+      }
+      return 'Les disponibilités des participants ne se recoupent pas sur ' + durLabel(m.dur) + '.';
+    }
+    return 'Tous les créneaux communs sont pris par ' + mt(u.conflicts) + '.';
+  }
+  function renderPlan() {
+    if (!plan) return;
+    var out = $('#planOut');
+    if (!state.meetings.length) { out.innerHTML = '<div class="card empty">Aucune réunion à planifier. Ajoutez-en dans l’onglet « Réunions ».</div>'; return; }
+    var st = plan.stats, lo = state.startH * 2, hi = state.endH * 2;
+    var prioOk = st.prioPlaced === st.prio;
+    var h = '<div class="summary">' +
+      '<div class="stat ' + (st.prio ? (prioOk ? 'good' : 'bad') : '') + '"><b>' + st.prioPlaced + ' / ' + st.prio + '</b><span>★ prioritaires planifiées</span></div>' +
+      '<div class="stat"><b>' + st.otherPlaced + ' / ' + st.other + '</b><span>autres réunions planifiées</span></div>' +
+      '<div class="stat"><b>' + durLabel(st.personSlots) + '</b><span>de temps de réunion (cumulé, par personne)</span></div></div>';
+
+    // Grille personnes × créneaux
+    var byStart = {};
+    plan.placed.forEach(function (pl) {
+      meetingById(pl.id).people.forEach(function (pid) { byStart[pid + ':' + pl.start] = pl; });
+    });
+    h += '<div class="card"><div class="scroll"><table class="grid"><thead><tr><th class="name">Personne</th>';
+    for (var hr = state.startH; hr < state.endH; hr++) h += '<th colspan="2">' + pad(hr) + 'h</th>';
+    h += '</tr></thead><tbody>';
+    state.people.forEach(function (p) {
+      h += '<tr><th class="name"><span class="nm" title="' + esc(personName(p)) + '">' + esc(personName(p)) + '</span></th>';
+      var s = lo;
+      while (s < hi) {
+        var pl = byStart[p.id + ':' + s];
+        if (pl) {
+          var m = meetingById(pl.id);
+          h += '<td class="blk" colspan="' + pl.dur + '" style="--h:' + hueOf(m) + '" title="' + esc(titleOf(m)) + ' · ' + slotLabel(pl.start) + '–' + slotLabel(pl.start + pl.dur) + '">' +
+            (m.prio ? '★ ' : '') + esc(titleOf(m)) + '</td>';
+          s += pl.dur;
+        } else {
+          h += '<td class="cell' + (s % 2 === 0 ? ' hh' : '') + (isBlocked(s) ? ' blocked' : (p.avail[s] ? ' free' : '')) + '"></td>';
+          s++;
+        }
+      }
+      h += '</tr>';
+    });
+    h += '</tbody></table></div>' +
+      '<div class="legend"><span><i class="sw" style="background:color-mix(in srgb,var(--on) 45%,transparent)"></i>Disponible, sans réunion</span>' +
+      '<span><i class="sw" style="background:var(--off)"></i>Indisponible</span></div></div>';
+
+    // Agenda
+    h += '<h2>Ordre du jour</h2><div class="agenda">';
+    if (!plan.placed.length) h += '<div class="card empty">Aucune réunion n’a pu être placée.</div>';
+    plan.placed.forEach(function (pl) {
+      var m = meetingById(pl.id);
+      h += '<div class="slotline" style="--h:' + hueOf(m) + '"><div class="time">' + slotLabel(pl.start) + ' – ' + slotLabel(pl.start + pl.dur) + '</div>' +
+        '<div><div>' + (m.prio ? '<span class="star">★</span> ' : '') + '<b>' + esc(titleOf(m)) + '</b> <span class="who">(' + durLabel(pl.dur) + ')</span></div>' +
+        '<div class="who">' + esc(m.people.map(function (id) { return personName(personById(id)); }).join(', ')) + '</div></div></div>';
+    });
+    h += '</div>';
+
+    if (plan.unplaced.length) {
+      h += '<div class="unplaced"><h3>' + plan.unplaced.length + ' réunion' + (plan.unplaced.length > 1 ? 's' : '') + ' non planifiée' + (plan.unplaced.length > 1 ? 's' : '') + '</h3><ul>';
+      plan.unplaced.sort(function (a, b) { return Number(b.prio) - Number(a.prio); }).forEach(function (u) {
+        var m = meetingById(u.id);
+        h += '<li>' + (m.prio ? '<span class="star">★</span> ' : '') + '<b>' + esc(titleOf(m)) + '</b> — ' + esc(reasonText(u)) + '</li>';
+      });
+      h += '</ul></div>';
+    }
+    h += '<p class="note">' + (plan.optimal
+      ? 'Solution optimale : aucune autre combinaison ne planifie plus de réunions (prioritaires d’abord). À égalité, le planning le plus compact est retenu.'
+      : 'Meilleure solution trouvée dans le temps imparti (le problème est très grand) ; elle peut ne pas être optimale.') +
+      ' Calculé en ' + plan.elapsedMs + ' ms.</p>';
+    out.innerHTML = h;
+  }
+  $('#btnSolve').addEventListener('click', computePlan);
+  $('#btnPrint').addEventListener('click', function () { window.print(); });
+
+  function planAsText() {
+    var d = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    var t = 'Planning des réunions — ' + d + '\n\n';
+    plan.placed.forEach(function (pl) {
+      var m = meetingById(pl.id);
+      t += slotLabel(pl.start) + '–' + slotLabel(pl.start + pl.dur) + '  ' + (m.prio ? '★ ' : '') + titleOf(m) + ' (' +
+        m.people.map(function (id) { return personName(personById(id)); }).join(', ') + ')\n';
+    });
+    if (plan.unplaced.length) {
+      t += '\nNon planifiées :\n';
+      plan.unplaced.forEach(function (u) { var m = meetingById(u.id); t += '- ' + (m.prio ? '★ ' : '') + titleOf(m) + ' : ' + reasonText(u) + '\n'; });
+    }
+    return t;
+  }
+  $('#btnCopy').addEventListener('click', function () {
+    if (!plan) return;
+    var txt = planAsText(), btn = $('#btnCopy');
+    var done = function () { btn.textContent = 'Copié ✓'; setTimeout(function () { btn.textContent = 'Copier le planning'; }, 1600); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(done, function () { fallbackCopy(txt); done(); });
+    } else { fallbackCopy(txt); done(); }
+  });
+  function fallbackCopy(txt) {
+    var ta = document.createElement('textarea');
+    ta.value = txt; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+    document.body.removeChild(ta);
+  }
+
+  /* ---------- Menu haut : exemple / export / import / vider ---------- */
+  function afterDataChange() { save(); plan = null; setTab(currentTab); updateCounts(); }
+  $('#btnExample').addEventListener('click', function () {
+    if ((state.people.length || state.meetings.length) && !confirm('Remplacer les données actuelles par l’exemple ?')) return;
+    state = example(); afterDataChange();
+  });
+  $('#btnClear').addEventListener('click', function () {
+    if (!confirm('Supprimer toutes les personnes et réunions ?')) return;
+    state = blank(); afterDataChange();
+  });
+  $('#btnExport').addEventListener('click', function () {
+    var blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'table_turn_' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+  $('#btnImport').addEventListener('click', function () { $('#fileIn').click(); });
+  $('#fileIn').addEventListener('change', function (e) {
+    var f = e.target.files[0];
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      try {
+        var d = sanitize(JSON.parse(r.result));
+        if (!d) throw new Error('format');
+        state = d; afterDataChange();
+      } catch (err) { alert('Fichier non reconnu.'); }
+    };
+    r.readAsText(f);
+    e.target.value = '';
+  });
+
+  /* ---------- Démarrage ---------- */
+  setTab('avail');
+})();
+</script>
+</body>
+</html>
